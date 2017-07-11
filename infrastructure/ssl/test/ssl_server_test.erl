@@ -150,7 +150,7 @@ t6_test()->
     PacketNumStart=0,
 
     {ok,SessionId_1}=ssl_server_interface:connect(Addr,1155,ClientSetUp,TimeOut),
-    {badrpc,Reason,0}=ssl_server_interface:call(SessionId_1,{ms_1,badrpc,[50,1]},TimeOut,PacketNumStart),
+    {badrpc,_Reason,0}=ssl_server_interface:call(SessionId_1,{ms_1,badrpc,[50,1]},TimeOut,PacketNumStart),
      ssl_server_interface:disconnect(SessionId_1),
     ok.
 
