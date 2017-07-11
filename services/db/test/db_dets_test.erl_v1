@@ -1,0 +1,78 @@
+%%% -------------------------------------------------------------------
+%%% Author  : uabjle
+%%% Created : 2017-07-11
+%%% Revsion : 1.0.0 :  Created
+%%% Description :
+%%% EUnit test for db_dets module.Simple key value db based on Erlang dets module
+%%% -------------------------------------------------------------------
+-module(db_dets_test).
+
+%% --------------------------------------------------------------------
+%% Include files
+%% --------------------------------------------------------------------
+-include_lib("eunit/include/eunit.hrl").
+
+%% --------------------------------------------------------------------
+%% Definitions
+%% --------------------------------------------------------------------
+
+%% --------------------------------------------------------------------
+%% External exports
+%% --------------------------------------------------------------------
+-export([]).
+%%
+%% API Functions
+%%
+
+
+%% --------------------------------------------------------------------
+%% Function: fun/x
+%% Description: fun x skeleton 
+%% Returns:ok|error
+%% --------------------------------------------------------------------
+
+init_test()->
+    {ok,created}=db_dets:create(file_set,set),
+    {ok,created}=db_dets:create(file_bag,bag),
+    {ok,created}=db_dets:create(file_duplicatedBag,duplicate_bag),
+    ok.
+    
+    
+    
+
+dets_test()->
+    {ok,create}=misc_dets:create("test.dets"),
+    {error,create_file_already_exist}=misc_dets:create("test.dets"),
+    {ok,set}=misc_dets:set("test.dets",key1,value1),
+    {ok,value1}=misc_dets:get("test.dets",key1), 
+    {error,no_entry}=misc_dets:get("test.dets",key_no_entry),
+    {ok,set}=misc_dets:set("test.dets",key2,value2),
+    {ok,[{key2,value2},{key1,value1}]}=misc_dets:all("test.dets"),
+    {ok,remove}=misc_dets:remove("test.dets",key1),
+    {error,no_entry}=misc_dets:get("test.dets",key1),
+    {ok,delete}=misc_dets:delete("test.dets").
+
+ring_test()->
+    {ok,init_ring}=ring:init("test_ring.dets",5),
+    {ok,create_file_already_exist}=ring:init("test_ring.dets",5),
+    {ok,0}=ring:first("test_ring.dets"),
+    {ok,set}=ring:set("test_ring.dets",0,value0),
+    1=ring:next_pos("test_ring.dets"),
+    {ok,set}=ring:set("test_ring.dets",1,value1),
+    {ok,value0}=ring:get("test_ring.dets",0),
+    {ok,value1}=ring:get("test_ring.dets",1),
+    os:cmd("rm test_ring.dets").
+
+
+md5_test()->
+    {ok,<<174,191,191,172,103,255,227,112,23,47,43,98,249,9,52,172>>}=my_md5:file2md5("x1.JPG"),
+    {ok,<<119,121,161,84,112,93,77,111,121,147,252,171,251,229,126,95>>}=my_md5:file2md5("x1.NEF").
+
+%%
+%% Local Functions
+%%
+%% --------------------------------------------------------------------
+%% Function: fun/x
+%% Description: fun x skeleton 
+%% Returns:ok|error
+%% --------------------------------------------------------------------
