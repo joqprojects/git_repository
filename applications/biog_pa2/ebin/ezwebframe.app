@@ -1,0 +1,9 @@
+{application,ezwebframe,
+             [{description,[]},
+              {vsn,"1"},
+              {registered,[]},
+              {applications,[kernel,stdlib]},
+              {mod,{ezwebframe_app,[]}},
+              {env,[]},
+              {modules,[ezwebframe,ezwebframe_app,ezwebframe_demos,
+                        ezwebframe_mochijson2,ezwebframe_sup]}]}.
