@@ -67,7 +67,7 @@ connect(Addr,Port,SetUp,TimeOut)->
     CallerId=self(),
     SessionId=spawn(fun()->session(CallerId,Addr,Port,SetUp) end),
     receive
-	{SessionId,R}->
+	{SessionId,_R}->
 	    SessionId!{self(),{connect_req,[]}},
 	    receive
 		{SessionId,{server_reply,connect_ack}}->
@@ -98,8 +98,8 @@ connect(Addr,Port,SetUp)->
     SessionId=spawn(fun()->session(CallerId,Addr,Port,SetUp) end),
 
     receive
-	{SessionId,R}->
-	    {R,SessionId};
+	{SessionId,_R}->
+	    ok;
 	Unmatched ->
 	    io:format("Unmatched Signal ~p~n",[{?MODULE,?LINE,Unmatched}]),
 	    SessionId={error,unmatched,Unmatched}
@@ -168,18 +168,3 @@ poll(SessionId)->
     
 cast(SessionId,{M,F,A})->
     SessionId!{self(),{cast,[M,F,A]}}.
-
-
-
-mycrash()->
-    S=self(),
-    Pid=spawn(fun()->mycrash(S) end),
-    receive
-	{Pid,R}->
-	    Reply=R
-    after 100->
-	    Reply=timeout
-    end,
-    Reply.
-mycrash(Pid)->
-    Pid!{self(),crash}.

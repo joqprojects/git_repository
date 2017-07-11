@@ -136,7 +136,7 @@ t6_test()->
     PacketNumStart=0,
 
     {ok,SessionId_1}=microservice_interface:connect(Addr,1155,ClientSetUp,TimeOut),
-    {badrpc,Reason,0}=microservice_interface:call(SessionId_1,{ms_1,badrpc,[50,1]},TimeOut,PacketNumStart),
+    {badrpc,_Reason,0}=microservice_interface:call(SessionId_1,{ms_1,badrpc,[50,1]},TimeOut,PacketNumStart),
      microservice_interface:disconnect(SessionId_1),
     ok.
 
