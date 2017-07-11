@@ -1,0 +1,22 @@
+<body>
+<!DOCTYPE html>
+<html>
+
+<script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="/ezwebframe/websock.js"></script>
+<link rel="stylesheet" href="biogas.css" type="text/css">
+
+<body>
+<img src="logo.png" style="width:300px;height:75px;">
+
+<div id="txt_waste_input"></div>
+<div id="txt_gas_volume"></div>
+
+<script>
+$(document).ready(run);
+function run(){
+connect_to_erlang("localhost",2000, "web_tellstick");
+}
+</script>
+</body>
+</html>

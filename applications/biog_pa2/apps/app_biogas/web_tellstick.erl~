@@ -1,0 +1,236 @@
+%% Author: uabjle
+%% Created: 2016-01-21
+%% Description:
+%% Implements the web interface for the distributed remote controller
+%% 
+%%
+%%
+-module(web_tellstick).
+
+%%
+%% Include files
+%%
+%% --------------------------------------------------------------------
+%% Include files
+%% --------------------------------------------------------------------
+-include("include/tellstick.hlr").
+%%
+
+%% Exported Functions
+%%
+-export([start/1]).
+
+%%
+%% API Functions
+%%
+
+%% --------------------------------------------------------------------
+%% Function: start
+%% Description: The html and joes ezweb calls the start to initiate a new session
+%% Returns: NoN
+%% --------------------------------------------------------------------
+start(Browser) ->
+   % frame(Browser,text_box_1,"Enter Password"),
+   % update_frame(Browser),
+   % loop(Browser,login).
+    case tellstick_controller:connect() of
+	ok->
+	    update_frame(Browser),
+	    frame(Browser,text_box_1,"Enter Password"),
+	    loop(Browser,login);
+	session_ongoing ->
+	    frame(Browser,text_box_1,"Someone already logged in, try later")
+    end.
+  %  try tellstick_controller:connect() of
+%	connected->
+ %   frame(Browser,text_box_1,"Enter Password"),
+%	    update_frame(Browser),
+%	    loop(Browser,login);
+%	no_connection->
+%	    frame(Browser,text_box_1,"No connection")
+ %  catch
+%	X:Y->
+%	    io:format("catch ~p~n",[{?MODULE,?LINE,X,Y}]),
+%	    frame(Browser,text_box_1,"Time Out")
+ %  end.
+
+
+loop(Browser,login)->
+    receive 
+	{Browser, {struct, [{entry,<<"login_box">>},{txt,PasswordBin}]}}->
+	    {User,Password}=sd:send(dbase,get_tuple,[password,admin,?DBASE_FILE]),
+	    case Password==binary_to_list(PasswordBin) of
+		true->
+		    frame(Browser,text_box_1,"Welcome"),
+		    NextState=in_session;
+		false->
+		    frame(Browser,text_box_1,"Wrong Password- try again"),
+		    NextState=login
+	    end;
+	X->
+	    io:format("~p~n",[{?MODULE,?LINE,X}]),
+	    NextState=login
+    after ?TIMEOUT_SESSION ->
+	    frame(Browser,text_box_1,"Timeout due to no activities"),
+	    tellstick_controller:disconnect(),
+	    NextState=stop	
+    end,
+    loop(Browser,NextState);
+
+loop(_,stop)->
+    ok;
+loop(Browser,in_session)->
+  %  io:format("~p~n",[{?MODULE,?LINE,in_session}]),
+    receive 
+	% Button clicked 
+	{Browser, {struct,[{clicked,<<"element">>}]}}->
+	    frame(Browser,element,clicked(element)),
+	    NextState=in_session;
+
+	{Browser, {struct,[{clicked,<<"lampor">>}]}}-> 
+	    frame(Browser,lampor,clicked(lampor)),
+	    NextState=in_session;
+
+	{Browser, {struct,[{clicked,<<"scheme">>}]}}->
+	    frame(Browser,scheme,clicked(scheme)),
+	    NextState=in_session;
+
+	{Browser, {struct,[{clicked,<<"logout">>}]}}-> 
+	    frame(Browser,text_box_1,"End  of Session"),
+	    tellstick_controller:disconnect(),
+	    NextState=stop;
+
+	{Browser, {struct,[{clicked,X}]}}-> 
+	    NextState=in_session,
+	    io:format("unmatched~p~n",[{?MODULE,?LINE,clicked,X}]);
+	% Text input 
+	{Browser, {struct, [{entry,Input_box_bin},{txt, Text_bin}]}}->
+	    io:format("~p~n",[{?MODULE,?LINE,text,Input_box_bin}]),
+	    NextState=in_session;
+
+	% Text output
+	{_Pid,{text_output,Id,Text}}->
+	    Browser ! [{cmd,fill_div}, {id,Id}, {txt,list_to_binary(Text)}],
+	    NextState=in_session,
+	    io:format("~p~n",[{?MODULE,?LINE,text_output,NextState}]);
+   
+	X ->
+	    io:format("unmatched ~p~n",[{?MODULE,?LINE,X}]),
+	    NextState=in_session
+	% Prevent hanging processes  
+    after ?TIMEOUT_SESSION  ->
+	    frame(Browser,text_box_1,"Timeout no activites"),
+	    tellstick_controller:disconnect(),	    
+	    NextState=stop
+    end,
+    loop(Browser,NextState).
+
+%% --------------------------------------------------------------------
+%% Function: login(Browser)
+%% Description: login session
+%% Returns: message to send to logic
+%% --------------------------------------------------------------------
+
+%% --------------------------------------------------------------------
+%% Function:clicked
+%% Description: creates a message based on a button action
+%% Returns: message to send to logic
+%% --------------------------------------------------------------------
+clicked(scheme)->
+    {_,Status}=sd:send(dbase,get_tuple,[scheme,current_status,?DBASE_FILE]),
+    case  Status of
+	on->
+	    NewStatus=off;
+	off->
+	    NewStatus=on
+    end,
+    sd:send(dbase,store_tuple,[scheme,current_status,NewStatus,?DBASE_FILE]),
+    io:format("scheme ~p~n",[{?MODULE,?LINE,NewStatus}]),
+  %      tellstick_server:cmd(elem_vrum,NewStatus),
+    NewStatus;
+clicked(element)->
+    {_,Status}=sd:send(dbase,get_tuple,[element,current_status,?DBASE_FILE]),
+    case  Status of
+	on->
+	    NewStatus=off;
+	off->
+	    NewStatus=on
+    end,
+    tellstick_controller:set(element,NewStatus),
+    sd:send(dbase,store_tuple,[element,current_status,NewStatus,?DBASE_FILE]),
+    io:format("element ~p~n",[{?MODULE,?LINE,NewStatus}]),
+  %      tellstick_server:cmd(elem_vrum,NewStatus),
+    NewStatus;
+
+clicked(lampor) ->
+    {_,Status}=sd:send(dbase,get_tuple,[lampor,current_status,?DBASE_FILE]),
+    case  Status of
+	on->
+	    NewStatus=off;
+	off->
+	    NewStatus=on
+    end,
+    tellstick_controller:set(lampor,NewStatus),
+    sd:send(dbase,store_tuple,[lampor,current_status,NewStatus,?DBASE_FILE]),
+    io:format("lampor ~p~n",[{?MODULE,?LINE,NewStatus}]),
+    %tellstick_server:cmd(lampor,NewStatus),
+    NewStatus.
+
+
+%% --------------------------------------------------------------------
+%% Function:frame/2
+%% Description: creates a message based on a button action
+%% Returns: message to send to logic
+%% --------------------------------------------------------------------
+frame(Browser,text_box_1,Text)->
+ %   io:format("~p~n",[{?MODULE,?LINE,Browser,text_box_1,Text}])  ,
+    Browser ! [{cmd,fill_div}, {id,text_box_1}, {txt,list_to_binary(Text)}];
+
+frame(Browser,Button,Status)->
+  %  io:format("frame ~p~n",[{?MODULE,?LINE,Button,Status}]),   
+ 
+  {type,Type}=sd:send(dbase,get_tuple,[Button,type,?DBASE_FILE]),
+ 
+   case {type,Type} of
+	{type,tellstick_switch}->
+	    {Status,[{_,_},{Red,Status_red},{Blue,Status_blue}]}=sd:send(dbase,get_tuple,[Button,Status,?DBASE_FILE]),
+%	    io:format("frame cmd ~p~n",[{?MODULE,?LINE,Red,Status_red,Blue,Status_blue}])   ,
+	    Browser ! [{cmd,fill_div}, {id,Red}, {txt,list_to_binary(Status_red)}],
+	    Browser ! [{cmd,fill_div}, {id,Blue}, {txt,list_to_binary(Status_blue)}];
+	{type,switch}->	
+	    {Status,[{Red,Status_red},{Blue,Status_blue}]}=sd:send(dbase,get_tuple,[Button,Status,?DBASE_FILE]),
+%	    io:format("frame cmd ~p~n",[{?MODULE,?LINE,Red,Status_red,Blue,Status_blue}])   ,
+	    Browser ! [{cmd,fill_div}, {id,Red}, {txt,list_to_binary(Status_red)}],
+	    Browser ! [{cmd,fill_div}, {id,Blue}, {txt,list_to_binary(Status_blue)}];
+	X->
+	    io:format("unmatched signal ~p~n",[{?MODULE,?LINE,X}]),
+	    NextState=in_session
+    end.
+
+update_frame(Browser)->
+    {ok,RecordList}=sd:send(dbase,all,[?DBASE_FILE]),
+ %   io:format("RecordList =   ~p~n",[{?MODULE,?LINE,RecordList}]),
+    update_frame(Browser,RecordList).
+update_frame(Browser,[])->
+    Temp=tellstick_controller:get(temp_167,temp_sensor),
+    Browser ! [{cmd,fill_div}, {id,txt_temp}, {txt,list_to_binary(Temp)}];
+update_frame(Browser,[{Id,_Info}|T]) ->
+    {type,Type}=sd:send(dbase,get_tuple,[Id,type,?DBASE_FILE]),
+    case {type,Type} of
+	{type,tellstick_switch}->
+	    {current_status,Status}=sd:send(dbase,get_tuple,[Id,current_status,?DBASE_FILE]),	    
+	    {Status,[{_,_},{Red,Status_red},{Blue,Status_blue}]}=sd:send(dbase,get_tuple,[Id,Status,?DBASE_FILE]),
+%	    io:format("frame cmd ~p~n",[{?MODULE,?LINE,Red,Status_red,Blue,Status_blue}])   ,
+	    Browser ! [{cmd,fill_div}, {id,Red}, {txt,list_to_binary(Status_red)}],
+	    Browser ! [{cmd,fill_div}, {id,Blue}, {txt,list_to_binary(Status_blue)}];
+	{type,switch}->	
+	   {current_status,Status}=sd:send(dbase,get_tuple,[Id,current_status,?DBASE_FILE]),	    
+	    {Status,[{Red,Status_red},{Blue,Status_blue}]}=sd:send(dbase,get_tuple,[Id,Status,?DBASE_FILE]),
+%	    io:format("frame cmd ~p~n",[{?MODULE,?LINE,Red,Status_red,Blue,Status_blue}])   ,
+	    Browser ! [{cmd,fill_div}, {id,Red}, {txt,list_to_binary(Status_red)}],
+	    Browser ! [{cmd,fill_div}, {id,Blue}, {txt,list_to_binary(Status_blue)}];
+	X->
+%	    io:format("other  ~p~n",[{?MODULE,?LINE,X}]),
+	    ok 
+   end,
+    update_frame(Browser,T).

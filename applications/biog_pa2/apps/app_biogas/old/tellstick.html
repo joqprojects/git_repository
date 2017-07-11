@@ -1,0 +1,34 @@
+<script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="/ezwebframe/websock.js"></script>
+<link rel="stylesheet" href="tellstick.css" type="text/css">
+
+
+<body>
+<h3>       Temperatur :           </h3>
+
+<div id="txt_temp"></div>
+
+<div id="text_box_1"></div>
+<input class="live_input" type="password" id="login_box"></input>
+<button id="logout">Avsluta</button>
+
+<button id="element">element</button>
+<div id="txt_element_blue"></div>
+<div id="txt_element_red"></div>
+<button id="lampor">lampor</button>
+<div id="txt_lampor_blue"></div> 
+<div id="txt_lampor_red"></div>
+
+<button id="scheme">schema</button>
+<div id="txt_scheme_blue"></div>
+<div id="txt_scheme_red"></div>
+<script>
+$(document).ready(run);
+function run(){
+  $("#element").click(function(){ send_json({clicked:'element'}); });
+  $("#lampor").click(function(){ send_json({clicked:'lampor'}); });
+  $("#scheme").click(function(){ send_json({clicked:'scheme'}); });
+  $("#logout").click(function(){ send_json({clicked:'logout'}); });
+connect_to_erlang("localhost",2000, "web_tellstick");
+}
+</script>
