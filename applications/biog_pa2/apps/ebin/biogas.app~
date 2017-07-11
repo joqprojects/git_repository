@@ -1,0 +1,12 @@
+%% This is the application resource file (.app file) for the 'base'
+%% application.
+{application, tellstick_controller,
+[{description, "Stugan tellstick controller " },
+{vsn, "1.0.0" },
+{modules, 
+	  [tellstick_controller_app,tellstick_controller_sup,tellstick_controller,scheme_server]},
+{registered,[tellstick_controller]},
+{applications, [kernel,stdlib]},
+{mod, {tellstick_controller_app,[]}},
+{start_phases, []}
+]}.
