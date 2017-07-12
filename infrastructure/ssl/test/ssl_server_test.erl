@@ -41,9 +41,9 @@ start_servers_test()->
     CertFile= "ebin/certificate.pem",
     KeyFile = "ebin/key.pem",
     ok=ssl_server_interface:start(1055,PacketFormat,CertFile,KeyFile, ms_1,1),
-    ok=ssl_server:start_server(1155,PacketFormat,CertFile,KeyFile, ms_1,1),
-    ok=ssl_server:start_server(1255,PacketFormat,CertFile,KeyFile, ms_2,2),
-    ok=ssl_server:start_server(1355,PacketFormat,CertFile,KeyFile, ms_1,3),
+    ok=ssl_server_interface:start_server(1155,PacketFormat,CertFile,KeyFile, ms_1,1),
+    ok=ssl_server_interface:start_server(1255,PacketFormat,CertFile,KeyFile, ms_2,2),
+    ok=ssl_server_interface:start_server(1355,PacketFormat,CertFile,KeyFile, ms_1,3),
     ok.
 
 one_packet_test()->
