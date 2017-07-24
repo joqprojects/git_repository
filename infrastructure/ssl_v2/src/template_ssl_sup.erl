@@ -3,21 +3,21 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_child/0]).
+-export([start_link/2, start_child/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
-start_link(LSock) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [LSock]).
+start_link(LSock,CallBackModule) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, [LSock,CallBackModule]).
 
 start_child() ->
     supervisor:start_child(?SERVER, []).
 
-init([LSock]) ->
-    Server = {template_ssl_server, {template_ssl_server, start_link, [LSock]},
+init([LSock,CallBackModule]) ->
+    Server = {template_ssl_server, {template_ssl_server, start_link, [LSock,CallBackModule]},
               temporary, brutal_kill, worker, [template_ssl_server]},
     Children = [Server],
     RestartStrategy = {simple_one_for_one, 0, 1},

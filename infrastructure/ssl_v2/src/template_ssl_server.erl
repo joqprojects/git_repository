@@ -26,19 +26,19 @@
 %% --------------------------------------------------------------------
 %% External exports
 
--export([start_link/1,stop/0]).
+-export([start_link/2,stop/0]).
 
 
 %% gen_server callbacks
 -export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {lsock}).
+-record(state, {lsock,callBackModule}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(LSock) ->
-    gen_server:start_link(?MODULE, [LSock], []).
+start_link(LSock,CallBackModule) ->
+    gen_server:start_link(?MODULE, [LSock,CallBackModule], []).
 stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 
@@ -55,9 +55,9 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([LSock]) ->
+init([LSock,CallBackModule]) ->
     
-    {ok, #state{lsock = LSock}, 0}.
+    {ok, #state{lsock = LSock, callBackModule=CallBackModule}, 0}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -115,12 +115,13 @@ handle_info({ssl,Socket, BinData}, State) ->
     {noreply, NewState};
 
 handle_info({ssl_closed, _Socket}, State) ->
+    template_ssl_sup:start_child(),
+%    {noreply, State};
     {stop, normal, State};
 
 handle_info(timeout, #state{lsock = LSock} = State) ->
     {ok,Socket}= ssl:transport_accept(LSock),
     ok= ssl:ssl_accept(Socket),
-    template_ssl_sup:start_child(),
     {noreply, State};
 
 handle_info(Info, State) ->
@@ -160,8 +161,25 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description:
 %% Returns: non
 %% --------------------------------------------------------------------
-
 handle_data(Socket,BinData,State)->
-    %Data=binary_to_term(BinData),
-    ssl:send(Socket,BinData),
+    CBM=State#state.callBackModule,
+    {M,F,A,PacketNum}=binary_to_term(BinData),
+    case M of
+	CBM->
+	    case rpc:call(node(),M,F,A) of
+		{badrpc,Err}->
+		    {Reply,Result}={reply,{error,{badrpc,Err}}};
+		{Reply,R}->
+		    {Reply,Result}={Reply,R}
+	    end;
+	Err->
+	    {Reply,Result}={reply,{error,{notImplemented,Err}}}
+    end,
+    case Reply of
+	reply->
+	    BinReply=term_to_binary({Result,PacketNum}),
+	    ssl:send(Socket,BinReply);
+	noreply ->
+	    doNothing
+    end,
     State.

@@ -1,11 +1,12 @@
 -module(template_ssl_system).
 
--export([start/3, stop/1]).
+-export([start/4, stop/1]).
 
-start(ServiceName,Port,Setup) ->
+start(ServiceName,Port,Setup,CallBackModule) ->
     ok=ssl:start(),
     ok=application:set_env(ServiceName,port, Port),
     ok=application:set_env(ServiceName,clientsetup,Setup),
+    ok=application:set_env(ServiceName,callBackModule,CallBackModule),
     application:load(ServiceName),
     application:start(ServiceName),
     ok.

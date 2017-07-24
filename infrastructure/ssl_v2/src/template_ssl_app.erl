@@ -12,8 +12,9 @@ start(_StartType, _StartArgs) ->
                undefined -> ?DEFAULT_PORT
            end,
     {ok,SetUp}= application:get_env(template_ssl, clientsetup),
+    {ok,CallBackModule}= application:get_env(template_ssl, callBackModule),
     {ok, LSock} = ssl:listen(Port, SetUp),
-    case template_ssl_sup:start_link(LSock) of
+    case template_ssl_sup:start_link(LSock,CallBackModule) of
         {ok, Pid} ->
             template_ssl_sup:start_child(),
             {ok, Pid};
