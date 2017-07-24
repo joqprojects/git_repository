@@ -59,7 +59,7 @@ mulit_test()->
     Msg1={template_math,add,[20,21],0},
     Msg2={template_math,add,[20,22],0},
     ok=ssl:send(S1,term_to_binary(Msg1)),
-    ok=ssl:send(S1,term_to_binary(Msg2)),
+    ok=ssl:send(S2,term_to_binary(Msg2)),
     {{ok,41},0}=template_ssl_client:rec(S1,1000),
     {{ok,42},0}=template_ssl_client:rec(S2,1000),
     template_ssl_client:disconnect(S1),
