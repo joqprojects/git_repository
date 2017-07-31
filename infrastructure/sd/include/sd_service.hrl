@@ -1,0 +1,12 @@
+-define(SERVICE,sd_service).  % Defines the application in app file
+-define(SERVICE_SERVER,sd_server). % 
+-define(SERVICE_SUP,sd_service_sup).
+
+-define(CALLBACKMODULE,sd_service). % Call back module used by the gen_server
+-define(PACKET_FORMAT,[binary,{packet,4},{reuseaddr, true}, {active, true}]).
+-define(CERTFILE,"ebin/certificate.pem").
+-define(KEYFILE,"ebin/key.pem").
+-define(CLIENT_PACKET_FORMAT,[binary,{packet,4}]).
+-define(CONNECT_TIMEOUT,1000).
+-define(SYSTEM_TIMEOUT,1000).
+-define(CALL_TIMEOUT,10*1000).

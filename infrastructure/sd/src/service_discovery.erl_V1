@@ -1,0 +1,262 @@
+%%% -------------------------------------------------------------------
+%%% Author  : uabjle
+%%% Description : based on resource discovery in OTP in Action 
+%%% 1.Exposes local services to other SD and hold inventory
+%%%   target services
+%%% 2. Garbage collections of target services 
+%%% 3. Support calls or cast
+%%% 4. Interacts with connection pool
+%%%  Key data types
+%%%  Type = module 
+%%%  Instance = {IP_addr,Port}
+%%%  ResourceTuples =
+%%% Created : 10 dec 2012
+%%% -------------------------------------------------------------------
+-module(service_discovery).
+
+-behaviour(gen_server).
+
+%% --------------------------------------------------------------------
+%% Include files
+%% --------------------------------------------------------------------
+ -include("/include/infra.hrl").
+%% --------------------------------------------------------------------
+%% External exports
+-export([add_target_resource_type/1,add_local_resource/2,fetch_resources/1,trade_resources/4,trade_resources/1,
+	 get_local/0,get_target/0,get_found/0
+	]).
+
+-export([call/4,ensure_contact/0]).
+
+%% gen_server callbacks
+
+-export([start/0,stop/0]).
+
+-export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+-record(state, {target_resource_types,  % I want part
+	        local_resource_tuples,  % I have part
+	        found_resource_tuples  % Local cache of found resources
+	       }).
+
+%% ====================================================================
+%% External functions
+%% ====================================================================
+start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+stop()-> gen_server:call(?MODULE, {stop},infinity).
+
+
+call(Type,M,F,A)->
+% service_discovery:call(mymath,mymath,add,[N,3000])),
+   % io:format(" ~p~n",[{?MODULE,?LINE,{A,B,N}}]),
+    {ok,[{Ip,Port}|_]}=service_discovery:fetch_resources(Type),
+   % io:format(" ~p~n",[{?MODULE,?LINE,{Ip,Port}}]),
+    Reply=lib_chan_lib:call(Ip,Port,board_mgr,?LIBCHAN_PASSWD,{M,F,A}),
+
+  %  Reply=rpc:call(node(),port_server,call,[Ip,Port,{M,F,A}],10000),
+    Reply.
+
+add_target_resource_type(Type)->
+    gen_server:cast(?MODULE, {add_target_resource_type,Type}). 
+add_local_resource(Type,Instance)->
+    gen_server:cast(?MODULE, {add_local_resource,Type,Instance}). 
+	 
+fetch_resources(Type)->
+    gen_server:call(?MODULE, {fetch_resources,Type},infinity).
+
+trade_resources(MyIP,MyPort,OamIP,OamPort)->
+    gen_server:cast(?MODULE, {trade_resources,MyIP,MyPort,OamIP,OamPort}). 
+trade_resources({ReplyTo,Remotes})->
+    gen_server:cast(?MODULE, {trade_resources,{ReplyTo,Remotes}}).
+
+get_local()->
+    gen_server:call(?MODULE, {get_local},infinity).
+get_target()->
+    gen_server:call(?MODULE, {get_target},infinity).
+get_found()->
+    gen_server:call(?MODULE, {get_found},infinity).
+
+%% ====================================================================
+%% Server functions
+%% ====================================================================
+
+%% --------------------------------------------------------------------
+%% Function: init/1
+%% Description: Initiates the server
+%% Returns: {ok, State}          |
+%%          {ok, State, Timeout} |
+%%          ignore               |
+%%          {stop, Reason}
+%% --------------------------------------------------------------------
+init([]) ->
+    io:format("Starting ~p~n",[{?MODULE,?LINE,time()}]),
+    {ok, #state{target_resource_types = [],
+	        local_resource_tuples = dict:new(),
+		found_resource_tuples = dict:new()}
+    }.
+
+%% --------------------------------------------------------------------
+%% Function: handle_call/3
+%% Description: Handling call messages
+%% Returns: {reply, Reply, State}          |
+%%          {reply, Reply, State, Timeout} |
+%%          {noreply, State}               |
+%%          {noreply, State, Timeout}      |
+%%          {stop, Reason, Reply, State}   | (terminate/2 is called)
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+handle_call({fetch_resources,Type},_From, State) ->
+    Reply=dict:find(Type,State#state.found_resource_tuples),
+    {reply, Reply, State};
+
+handle_call({get_target},_From, State) ->
+    Reply=State#state.target_resource_types,
+    {reply, Reply, State};
+handle_call({get_local},_From, State) ->
+    Reply=dict:to_list(State#state.local_resource_tuples),
+    {reply, Reply, State};
+handle_call({get_found},_From, State) ->
+    Reply=dict:to_list(State#state.found_resource_tuples),
+    {reply, Reply, State};
+
+
+handle_call({stop}, _From, State) ->
+    {stop, normal, shutdown_ok, State};
+
+handle_call(Request, From, State) ->
+    Reply = {unmatched_signal,?MODULE,Request,From},
+    {reply, Reply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: handle_cast/2
+%% Description: Handling cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+handle_cast({add_target_resource_type,Type}, State) ->
+   % io:format("~p~n",[{?MODULE,?LINE,time()}]),
+    TargetTypes=State#state.target_resource_types,
+    NewTargetTypes=[Type|lists:delete(Type,TargetTypes)],
+    {noreply, State#state{target_resource_types=NewTargetTypes}};
+
+handle_cast( {add_local_resource,Type,Instance}, State) ->
+    io:format("unmatched match cast ~p~n",[{?MODULE,?LINE,time()}]),
+    ResourceTuples=State#state.local_resource_tuples,
+    NewResourceTuples=add_resource(Type,Instance,ResourceTuples),
+    {noreply, State#state{local_resource_tuples=NewResourceTuples}};
+
+
+handle_cast({trade_resources,MyIP,MyPort,OamIP,OamPort}, State) ->
+    io:format(" ~p~n",[{?MODULE,?LINE,time(),trade_resources,MyIP,MyPort,OamIP,OamPort}]),
+    ResourceTuples=State#state.local_resource_tuples,
+  %  {IpMy,PortMy}=State#state.my_address,
+  %  {NC_IP,NC_Port}=State#state.node_connect,
+    io:format(" ~p~n",[{?MODULE,?LINE,time(),OamIP,OamPort}]),
+    Nodes =rpc:call(node(),port_server,call,[OamIP,OamPort,{oam,get_all_nodes,[]}],2000),
+    io:format(" ~p~n",[{?MODULE,?LINE,time(),Nodes}]),
+    AllNodes=[{MyIP,MyPort}|Nodes],
+    lists:foreach(fun({Ip,Port}) ->
+			    io:format(" ~p~n",[{?MODULE,?LINE,time(),Ip,Port}]),  
+	      rpc:call(node(),port_server,cast,[Ip,Port,{service_discovery,trade_resources,[{{MyIP,MyPort},ResourceTuples}]}])
+	      %gen_server:cast({?MODULE,Node},
+	%		     {trade_resources, {node(),ResourceTuples}})
+      end,
+      AllNodes),
+    {noreply, State};
+
+handle_cast({trade_resources, {ReplyTo,Remotes}},
+	    #state{local_resource_tuples=Locals,
+		   target_resource_types=TargetTypes,
+		   found_resource_tuples = OldFound} =State) ->
+    
+    FilteredRemotes=resources_for_types(TargetTypes,Remotes),
+    NewFound= add_resources(FilteredRemotes,OldFound),
+    case ReplyTo  of
+        noreply ->
+	    ok;
+	{IpReply,PortReply} ->
+	    rpc:call(node(),port_server,cast,[IpReply,PortReply,{service_discovery,trade_resources,[{noreply,Locals}]}])
+	 %  gen_server:cast({?MODULE,ReplyTo},
+	%		   {trade_resources, {noreply, Locals}})
+    end,
+    {noreply, State#state{found_resource_tuples=NewFound}};
+
+handle_cast(Msg, State) ->
+    io:format("unmatched match cast ~p~n",[{Msg,?MODULE,?LINE,time()}]),
+    {noreply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: handle_info/2
+%% Description: Handling all non call/cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+%% --------------------------------------------------------------------
+%% Function: terminate/2
+%% Description: Shutdown the server
+%% Returns: any (ignored by gen_server)
+%% --------------------------------------------------------------------
+terminate(_Reason, _State) ->
+    ok.
+
+%% --------------------------------------------------------------------
+%% Func: code_change/3
+%% Purpose: Convert process state when code is changed
+%% Returns: {ok, NewState}
+%% --------------------------------------------------------------------
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% --------------------------------------------------------------------
+%%% Exported functions
+%% --------------------------------------------------------------------
+ensure_contact()->
+    DefaultNodes=['contact1@main.domain.com','contact2@main.domain.com'],
+    DefaultNodes.    
+
+%% --------------------------------------------------------------------
+%%% Internal functions
+%% --------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% Func: code_change/3
+%% Purpose: Convert process state when code is changed
+%% Returns: {ok, NewState}
+%% --------------------------------------------------------------------
+
+%% --------------------------------------------------------------------
+%% Func: code_change/3
+%% Purpose: Convert process state when code is changed
+%% Returns: {ok, NewState}
+%% --------------------------------------------------------------------
+
+
+add_resource(Type,Resource,ResourceTuples)->
+    case dict:find(Type,ResourceTuples) of
+	{ok,ResourceList}->
+	    NewList=[Resource|lists:delete(Resource,ResourceList)],
+	    dict:store(Type,NewList,ResourceTuples);
+	error ->
+	    dict:store(Type,[Resource],ResourceTuples)
+    end.
+
+add_resources([{Type,Resource}|T],ResourceTuples)->
+    add_resources(T,add_resource(Type,Resource,ResourceTuples));
+add_resources([],ResourceTuples) ->
+    ResourceTuples.
+
+resources_for_types(Types,ResourceTuples)->
+    Fun =
+	fun(Type,Acc) ->
+		case dict:find(Type,ResourceTuples) of
+		    {ok,List}->
+			[{Type,Instance}||Instance <- List] ++Acc;
+		    error ->
+			Acc
+		end
+	end,
+    lists:foldl(Fun,[],Types).

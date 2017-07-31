@@ -1,0 +1,25 @@
+%% 
+
+-module(sd_test).
+
+-include_lib("eunit/include/eunit.hrl").
+-include("include/sd_service.hrl").
+-include("include/service_register.hrl").
+
+
+-export([]).
+
+% Basic tests on a singelton process
+
+start_system_test()->
+    ok=sd_service_if:start(?SD_PORT,1),
+    ok.
+
+basic_connect_disconnect_test()->
+    {ok,S1}=sd_service_if:connect_timeout(?SD_IP_ADDR,?SD_PORT,?CLIENT_PACKET_FORMAT,?CONNECT_TIMEOUT*5),
+    sd_service_if:disconnect(S1,?SYSTEM_TIMEOUT),
+    ok.
+
+stop_test()->
+    ok=oam_service_if:stop(?SERVICE),
+    ok.
